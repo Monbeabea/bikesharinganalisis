@@ -25,7 +25,7 @@ except FileNotFoundError:
     st.stop()
 
 # Ubah format tanggal
-df['dteday'] = pd.to_datetime(df['dteday'])
+df['dteday'] = pd.to_datetime(df['dteday'], format="%d/%m/%Y")
 
 # Konversi angka bulan ke nama bulan
 df['month'] = df['mnth'].map({
