@@ -1,14 +1,3 @@
-import subprocess
-import sys
-
-try:
-    import matplotlib.pyplot as plt
-except ModuleNotFoundError:
-    print("⚠️ Matplotlib tidak ditemukan, menginstal ulang...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "matplotlib"])
-    import matplotlib.pyplot as plt
-
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
@@ -30,29 +19,23 @@ st.markdown("---")
 data_file = "main_data.csv"
 
 try:
-    df = pd.read_csv(data_file)
+    df = pd.read_csv(data_file, delimiter=";")  # Update delimiter sesuai CSV
 except FileNotFoundError:
     st.error("Dataset tidak ditemukan. Pastikan file tersedia.")
     st.stop()
 
+# Cek apakah nama kolom sesuai
+expected_columns = [
+    "instant", "dteday", "season", "yr", "mnth", "holiday", "weekday", "workingday", 
+    "weathersit", "temp", "atemp", "hum", "windspeed", "casual", "registered", "cnt"
+]
+
+if list(df.columns) != expected_columns:
+    st.error("Nama kolom tidak sesuai. Cek kembali format CSV.")
+    st.stop()
+
 # Ubah format tanggal
 df['dteday'] = pd.to_datetime(df['dteday'], format="%d/%m/%Y")
-
-# Konversi angka bulan ke nama bulan
-df['month'] = df['mnth'].map({
-    1: "January", 2: "February", 3: "March", 4: "April",
-    5: "May", 6: "June", 7: "July", 8: "August",
-    9: "September", 10: "October", 11: "November", 12: "December"
-})
-
-# Konversi angka hari ke nama hari
-df['weekday_name'] = df['weekday'].map({
-    0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
-    4: "Thursday", 5: "Friday", 6: "Saturday"
-})
-
-# Buat kolom penanda weekday/weekend
-df['is_weekend'] = df['weekday'].apply(lambda x: 1 if x in [0, 6] else 0)
 
 # =========================
 # SIDEBAR FILTER
@@ -64,6 +47,8 @@ start_date, end_date = st.sidebar.date_input(
     max_value=df["dteday"].max()
 )
 
+st.sidebar.write(f"📅 Tanggal dipilih: {start_date} - {end_date}")
+
 filtered_df = df[(df['dteday'] >= pd.to_datetime(start_date)) & (df['dteday'] <= pd.to_datetime(end_date))]
 
 # =========================
@@ -71,8 +56,8 @@ filtered_df = df[(df['dteday'] >= pd.to_datetime(start_date)) & (df['dteday'] <=
 # =========================
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Penyewaan", value=filtered_df['cnt'].sum())
-col2.metric("Total Penyewaan Weekday", value=filtered_df[filtered_df['is_weekend'] == 0]['cnt'].sum())
-col3.metric("Total Penyewaan Weekend", value=filtered_df[filtered_df['is_weekend'] == 1]['cnt'].sum())
+col2.metric("Total Penyewaan Weekday", value=filtered_df[filtered_df['weekday'] < 5]['cnt'].sum())
+col3.metric("Total Penyewaan Weekend", value=filtered_df[filtered_df['weekday'] >= 5]['cnt'].sum())
 st.markdown("---")
 
 # =========================
@@ -80,9 +65,9 @@ st.markdown("---")
 # =========================
 
 # Penyewaan sepeda berdasarkan hari dalam seminggu
-weekday_rentals = filtered_df.groupby("weekday_name")["cnt"].mean().reset_index()
+weekday_rentals = filtered_df.groupby("weekday")["cnt"].mean().reset_index()
 fig_weekday = px.bar(
-    weekday_rentals, x='weekday_name', y='cnt',
+    weekday_rentals, x='weekday', y='cnt',
     title="Rata-rata Penyewaan Sepeda per Hari dalam Seminggu",
     color_discrete_sequence=['blue']
 )
@@ -90,13 +75,13 @@ fig_weekday.update_layout(xaxis_title='Hari', yaxis_title='Rata-rata Penyewaan')
 st.plotly_chart(fig_weekday, use_container_width=True)
 
 # Penyewaan sepeda berdasarkan bulan
-monthly_rentals = filtered_df.groupby("month")["cnt"].mean().reset_index()
+monthly_rentals = filtered_df.groupby("mnth")["cnt"].mean().reset_index()
 fig_monthly = px.line(
-    monthly_rentals, x='month', y='cnt', markers=True,
+    monthly_rentals, x='mnth', y='cnt', markers=True,
     title="Rata-rata Penyewaan Sepeda per Bulan",
     color_discrete_sequence=['green']
 )
-fig_monthly.update_layout(xaxis_title='Bulan', yaxis_title='Rata-rata Penyewaan')
+fig_monthly.update_layout(xaxis_title="Bulan", yaxis_title="Rata-rata Penyewaan")
 st.plotly_chart(fig_monthly, use_container_width=True)
 
 # Pengaruh cuaca terhadap penyewaan sepeda
